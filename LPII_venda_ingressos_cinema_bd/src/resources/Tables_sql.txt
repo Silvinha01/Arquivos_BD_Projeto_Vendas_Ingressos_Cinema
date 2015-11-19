@@ -1,0 +1,85 @@
+﻿-- TABELA FILME
+create table filme(
+idfilme serial primary key,
+nomefilme varchar(50),
+genero varchar(15),
+sinopse varchar(150)
+);
+
+DELETE FROM filme;
+ALTER SEQUENCE filme_idfilme_seq RESTART WITH 1;
+
+select * from filme;
+
+
+-- TABELA SALA
+create table sala(
+idsala serial primary key,
+qtdassentos integer
+);
+
+DELETE FROM sala;
+ALTER SEQUENCE sala_idsala_seq RESTART WITH 1;
+
+select * from sala;
+
+
+-- TABELA SESSÃO
+create table sessao(
+idsessao serial primary key,
+idsala_fk int references sala(idsala),
+qtdassentosdisponiveis integer, 
+idfilme_fk int references filme(idfilme),
+horario timestamp
+);
+
+DELETE FROM sessao;
+ALTER SEQUENCE sessao_idsessao_seq RESTART WITH 1;
+
+select * from sessao;
+
+
+-- TABELA VENDA
+create table venda(
+idvenda serial primary key,
+idsessao_fk int references sessao(idsessao),
+qtdingressos integer
+);
+
+DELETE FROM venda;
+ALTER SEQUENCE venda_idvenda_seq RESTART WITH 1;
+
+select * from venda;
+
+
+-- FUNCTION E TRIGGER VENDA_GATILHO
+CREATE or REPLACE FUNCTION venda_gatilho() 
+         RETURNS TRIGGER AS $venda_gatilho$
+    BEGIN	
+        IF (TG_OP = 'DELETE') THEN
+            UPDATE sessao SET qtdassentosdisponiveis = qtdassentosdisponiveis + OLD.qtdingressos WHERE idsessao = OLD.idsessao_fk; 
+            RETURN OLD;
+        ELSIF (TG_OP = 'UPDATE') THEN        
+            UPDATE sessao SET qtdassentosdisponiveis = qtdassentosdisponiveis + OLD.qtdingressos - NEW.qtdingressos WHERE idsessao = OLD.idsessao_fk;  
+            RETURN NEW;
+        ELSIF (TG_OP = 'INSERT') THEN
+            UPDATE sessao SET qtdassentosdisponiveis = qtdassentosdisponiveis - NEW.qtdingressos WHERE idsessao = NEW.idsessao_fk;       
+            RETURN NEW;
+        END IF;                   
+        RETURN NEW;
+    END;
+  $venda_gatilho$ LANGUAGE plpgsql;
+
+CREATE TRIGGER venda_gatilho BEFORE INSERT OR UPDATE OR DELETE ON venda
+  FOR EACH ROW EXECUTE PROCEDURE venda_gatilho();
+
+
+-- USADAS PARA TESTAR A TRIGGER
+insert into venda (idsessao_fk, qtdingressos) values (1,10);
+insert into venda (idsessao_fk, qtdingressos) values (1,4);
+insert into venda (idsessao_fk, qtdingressos) values (2,13);
+UPDATE venda SET qtdingressos = 6 WHERE idvenda=2;
+DELETE FROM venda WHERE idvenda = 1;
+    
+select * from venda;
+select * from sessao;
